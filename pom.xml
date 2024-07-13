@@ -74,7 +74,6 @@
 							<goal>jar</goal>
 						</goals>
 					</execution>
-                    
 				</executions>
 			</plugin>
             <plugin>
