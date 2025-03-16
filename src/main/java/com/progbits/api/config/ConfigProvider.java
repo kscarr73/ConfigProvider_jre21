@@ -32,7 +32,18 @@ public class ConfigProvider {
     private static ConfigProvider _instance = null;
     private static ReentrantLock lock;
     private final CountDownLatch configured = new CountDownLatch(1);
+    
+    public static enum ConfigTypes {
+        JSON,
+        YAML
+    }
+    
+    private static ConfigTypes configType = ConfigTypes.JSON;
 
+    public static void setConfigType(ConfigTypes newConfigType) {
+        configType = newConfigType;
+    }
+    
     public static ConfigProvider getInstance() {
         if (lock == null) {
             lock = new ReentrantLock();
@@ -60,6 +71,8 @@ public class ConfigProvider {
     }
 
     public void configure() {
+        String configExt = "." + configType.name().toLowerCase();
+        
         if (System.getProperty("CONFIG_FILE") != null) {
             log.info("Config File Used: " + System.getProperty("CONFIG_FILE"));
             this.setFileSystemConfig(System.getProperty("CONFIG_FILE"));
@@ -73,12 +86,12 @@ public class ConfigProvider {
 
         this.setConfig(this.getStringProperty("APP_CONFIG"));
 
-        this.setFileConfig("config/default.json");
+        this.setFileConfig("config/default" + configExt);
 
         if (this.getConfig().isSet("APP_INIT")) {
-            this.setFileConfig("config/" + _instance.getStringProperty("APP_INIT") + ".json");
+            this.setFileConfig("config/" + _instance.getStringProperty("APP_INIT") + configExt);
         } else {
-            this.setFileConfig("config/" + _instance.getStringProperty("APP_ENV") + ".json");
+            this.setFileConfig("config/" + _instance.getStringProperty("APP_ENV") + configExt);
         }
 
         configured.countDown();
@@ -247,7 +260,7 @@ public class ConfigProvider {
             }
 
             default -> {
-                return null;
+                return defVal;
             }
         }
     }
