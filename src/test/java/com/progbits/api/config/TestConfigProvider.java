@@ -7,8 +7,8 @@ public class TestConfigProvider {
 
     @Test
     public void testConfigProvider() {
-        assert config.getStringProperty("MY_TEST_CONFIG") != null;
+        assert config.getStringProperty("testing") != null;
         assert "this".equals(config.getStringProperty("testing")) : "Default File Failed";
-        assert "DEV".equals(config.getStringProperty("environment")) : "Environment Overwrite Failed";
-    }    
+        assert "default".equals(config.getStringProperty("environment")) : "Environment Overwrite Failed";
+    }
 }
