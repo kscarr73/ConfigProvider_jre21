@@ -53,9 +53,11 @@ public class ConfigProvider {
             lock.lock();
 
             try {
-            _instance = new ConfigProvider();
+                if (_instance == null) {
+                    _instance = new ConfigProvider();
 
-            _instance.configure();
+                    _instance.configure();
+                }
             } finally {
                 lock.unlock();
             }
