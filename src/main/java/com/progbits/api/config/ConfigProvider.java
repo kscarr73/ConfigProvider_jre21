@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,58 +21,37 @@ import com.progbits.api.exception.ApiException;
 import com.progbits.api.model.ApiObject;
 import com.progbits.api.parser.JsonObjectParser;
 import com.progbits.api.parser.YamlObjectParser;
+import com.progbits.api.utils.ApiResources;
+import com.progbits.api.utils.service.ApiInstance;
+import com.progbits.api.utils.service.ApiService;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ConfigProvider {
+public class ConfigProvider implements ApiService {
+
     private static final Logger log = LoggerFactory.getLogger(ConfigProvider.class);
 
-    private static ConfigProvider _instance = null;
-    private static ReentrantLock lock;
-    private final CountDownLatch configured = new CountDownLatch(1);
+    private static final ApiInstance<ConfigProvider> instance = new ApiInstance<>();
+    
+    public static ConfigProvider getInstance() {
+        return instance.getInstance(ConfigProvider.class);
+    }
     
     public static enum ConfigTypes {
         JSON,
         YAML
     }
-    
+
     private static ConfigTypes configType = ConfigTypes.JSON;
 
     public static void setConfigType(ConfigTypes newConfigType) {
         configType = newConfigType;
     }
-    
-    public static ConfigProvider getInstance() {
-        if (lock == null) {
-            lock = new ReentrantLock();
-        }
 
-        if (_instance == null) {
-            lock.lock();
-
-            try {
-                if (_instance == null) {
-                    _instance = new ConfigProvider();
-
-                    _instance.configure();
-                }
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        try {
-            _instance.configured.await();
-        } catch (InterruptedException ex) {
-            // nothing to report
-        }
-
-        return _instance;
-    }
-
+    @Override
     public void configure() {
         String configExt = "." + configType.name().toLowerCase();
-        
+
         if (System.getProperty("CONFIG_FILE") != null) {
             log.info("Config File Used: " + System.getProperty("CONFIG_FILE"));
             this.setFileSystemConfig(System.getProperty("CONFIG_FILE"));
@@ -91,13 +68,11 @@ public class ConfigProvider {
         this.setFileConfig("config/default" + configExt);
 
         if (this.getConfig().isSet("APP_INIT")) {
-            this.setFileConfig("config/" + _instance.getStringProperty("APP_INIT") + configExt);
+            this.setFileConfig("config/" + getStringProperty("APP_INIT") + configExt);
         } else {
-            this.setFileConfig("config/" + _instance.getStringProperty("APP_ENV") + configExt);
+            this.setFileConfig("config/" + getStringProperty("APP_ENV") + configExt);
         }
 
-        configured.countDown();
-        
         if (!configFeatures.isEmpty()) {
             for (var entry : configFeatures) {
                 entry.configure(this);
@@ -106,15 +81,17 @@ public class ConfigProvider {
     }
 
     private static List<ConfigFeature> configFeatures = new ArrayList<>();
-    
+
     private ApiObject _config = new ApiObject();
     private static final JsonObjectParser jsonParser = new JsonObjectParser(true);
     private static final String __OBFUSCATE = "OBF:";
 
+    private ApiResources apiResources = ApiResources.getInstance();
+    
     public static void registerFeature(ConfigFeature feature) {
         configFeatures.add(feature);
     }
-    
+
     private void setConfig(String config) {
         if (config != null) {
             try {
@@ -131,7 +108,6 @@ public class ConfigProvider {
             _config.put(entry.getKey(), entry.getValue());
         }
     }
-    
 
     private void setFileSystemConfig(String fileName) {
         InputStream inputStream = null;
@@ -165,12 +141,9 @@ public class ConfigProvider {
     }
 
     private void setFileConfig(String fileName) {
-        InputStream inputStream = null;
         BufferedReader buffRead = null;
 
-        try {
-            inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(fileName);
-
+        try (InputStream inputStream = apiResources.getResourceInputStream(fileName);) {
             if (inputStream != null) {
                 buffRead = new BufferedReader(new InputStreamReader(inputStream));
 
@@ -182,22 +155,11 @@ public class ConfigProvider {
                     addEntries(jsonParser.parseSingle(buffRead));
                 }
             }
-        } catch (ApiException | ApiClassNotFoundException aex) {
+        } catch (ApiException | IOException | ApiClassNotFoundException aex) {
             log.error("Configuration Parsing Failed");
-        } finally {
-            try {
-                if (buffRead != null) {
-                    buffRead.close();
-                }
-                if (inputStream != null) {
-                    inputStream.close();
-                }
-            } catch (IOException iex) {
-                // Nothing to Do Here
-            }
-        }
+        } 
     }
-
+    
     public void addEntries(ApiObject subject) {
         for (var entry : subject.entrySet()) {
             if (entry.getValue() instanceof String strVal) {
@@ -244,7 +206,7 @@ public class ConfigProvider {
             }
         }
     }
-    
+
     public Integer getIntProperty(String name, Integer defVal) {
         switch (_config.getType(name)) {
             case ApiObject.TYPE_INTEGER -> {
@@ -253,11 +215,11 @@ public class ConfigProvider {
 
             case ApiObject.TYPE_STRING -> {
                 String strVal = _config.getString(name);
-                
+
                 if (null == strVal) {
                     strVal = String.valueOf(defVal);
                 }
-                
+
                 return Integer.valueOf(strVal);
             }
 
@@ -276,7 +238,7 @@ public class ConfigProvider {
 
         return strRet;
     }
-    
+
     public String getStringProperty(String name, String defVal) {
         String strRet = _config.getString(name, defVal);
 
