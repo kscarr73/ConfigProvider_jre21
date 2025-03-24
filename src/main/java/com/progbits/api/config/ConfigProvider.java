@@ -69,7 +69,7 @@ public class ConfigProvider implements ApiService {
 
         if (this.getConfig().isSet("APP_INIT")) {
             this.setFileConfig("config/" + getStringProperty("APP_INIT") + configExt);
-        } else {
+        } else if (this.getConfig().isSet("APP_ENV")) {
             this.setFileConfig("config/" + getStringProperty("APP_ENV") + configExt);
         }
 
