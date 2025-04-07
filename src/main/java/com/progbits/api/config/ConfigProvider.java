@@ -42,16 +42,17 @@ public class ConfigProvider implements ApiService {
         YAML
     }
 
-    private static ConfigTypes configType = ConfigTypes.JSON;
+    private static ConfigTypes configType = ConfigTypes.YAML;
 
+    private static String CONFIG_EXT = "." + configType.name().toLowerCase();
+    
     public static void setConfigType(ConfigTypes newConfigType) {
         configType = newConfigType;
+        CONFIG_EXT = "." + configType.name().toLowerCase();
     }
 
     @Override
     public void configure() {
-        String configExt = "." + configType.name().toLowerCase();
-
         if (System.getProperty("CONFIG_FILE") != null) {
             log.info("Config File Used: " + System.getProperty("CONFIG_FILE"));
             this.setFileSystemConfig(System.getProperty("CONFIG_FILE"));
@@ -65,12 +66,12 @@ public class ConfigProvider implements ApiService {
 
         this.setConfig(this.getStringProperty("APP_CONFIG"));
 
-        this.setFileConfig("config/default" + configExt);
+        this.setFileConfig("config/default" + CONFIG_EXT);
 
         if (this.getConfig().isSet("APP_INIT")) {
-            this.setFileConfig("config/" + getStringProperty("APP_INIT") + configExt);
+            this.setFileConfig("config/" + getStringProperty("APP_INIT") + CONFIG_EXT);
         } else if (this.getConfig().isSet("APP_ENV")) {
-            this.setFileConfig("config/" + getStringProperty("APP_ENV") + configExt);
+            this.setFileConfig("config/" + getStringProperty("APP_ENV") + CONFIG_EXT);
         }
 
         if (!configFeatures.isEmpty()) {
@@ -162,7 +163,12 @@ public class ConfigProvider implements ApiService {
     
     public void addEntries(ApiObject subject) {
         for (var entry : subject.entrySet()) {
-            if (entry.getValue() instanceof String strVal) {
+            if ("$import".equals(entry.getKey()) 
+                   && subject.getType(entry.getKey()) == ApiObject.TYPE_STRINGARRAY) {
+                for (String fileName : subject.getStringArray(entry.getKey())) {
+                    setFileConfig("config/" + fileName + CONFIG_EXT);
+                }
+            } else if (entry.getValue() instanceof String strVal) {
                 if (strVal.contains("config~")) {
                     String[] plusKey = strVal.split("\\+");
                     String[] splitKey = strVal.split("config~");

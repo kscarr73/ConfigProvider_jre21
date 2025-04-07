@@ -1,0 +1,7 @@
+APP_ENV: DEV
+testing: this
+environment: default
+
+$import:
+  - TestFile
+  - app/app
